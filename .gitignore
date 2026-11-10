@@ -1,3 +1,7 @@
 .DS_Store
 *.key
 *.pem
+secrets.zsh
+*.bak
+*.bak-*
+.terminal-setup-backup-*/
