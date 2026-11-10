@@ -1,7 +1,0 @@
-font-family = "JetBrainsMono Nerd Font"
-window-padding-x = 10
-window-padding-y = 10
-theme = "Catppuccin Mocha"
-command = /opt/homebrew/bin/tmux new -A -s main
-keybind = cmd+b=text:
-window-save-state = always

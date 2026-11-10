@@ -1,0 +1,92 @@
+# ~/.zshrc (managed in dotfiles/terminal-setup, symlinked by install.sh)
+
+typeset -U path PATH   # dedupe PATH
+path=($HOME/.local/bin $HOME/go/bin $HOME/.opencode/bin $path)
+
+export EDITOR=nvim
+
+# --- History ---
+HISTFILE=~/.histfile
+HISTSIZE=10000
+SAVEHIST=100000
+setopt SHARE_HISTORY INC_APPEND_HISTORY
+bindkey -e
+
+# --- Secrets (not in git) ---
+[[ -r ~/.config/secrets.zsh ]] && source ~/.config/secrets.zsh
+
+# --- Completion (full rebuild at most once a day) ---
+autoload -Uz compinit
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then compinit; else compinit -C; fi
+
+# --- Prompt: Starship + transient prompt (old prompts collapse to a lone ❯) ---
+eval "$(starship init zsh)"
+zle-line-init() {
+  emulate -L zsh
+  [[ $CONTEXT == start ]] || return 0
+  while true; do
+    zle .recursive-edit
+    local -i ret=$?
+    [[ $ret == 0 && $KEYS == $'\4' ]] || break
+    [[ -o ignore_eof ]] || exit 0
+  done
+  local saved_prompt=$PROMPT saved_rprompt=$RPROMPT
+  PROMPT='%F{green}❯%f '
+  RPROMPT=''
+  zle .reset-prompt
+  PROMPT=$saved_prompt
+  RPROMPT=$saved_rprompt
+  if (( ret )); then zle .send-break; else zle .accept-line; fi
+  return ret
+}
+zle -N zle-line-init
+
+# --- pyenv: shims on PATH now, full init only when you call `pyenv` ---
+export PYENV_ROOT="$HOME/.pyenv"
+path=($PYENV_ROOT/bin $PYENV_ROOT/shims $path)
+pyenv() {
+  unfunction pyenv
+  eval "$(command pyenv init - --no-rehash zsh)"
+  eval "$(command pyenv virtualenv-init -)"
+  pyenv "$@"
+}
+
+# --- SDKMAN: candidates on PATH now, full init only when you call `sdk` ---
+export SDKMAN_DIR="$HOME/.sdkman"
+for d in $SDKMAN_DIR/candidates/*/current/bin(N); do path=($d $path); done
+[[ -d $SDKMAN_DIR/candidates/java/current ]] && export JAVA_HOME=$SDKMAN_DIR/candidates/java/current
+sdk() {
+  unfunction sdk
+  source "$SDKMAN_DIR/bin/sdkman-init.sh"
+  sdk "$@"
+}
+
+# --- Atuin (Ctrl-R history) ---
+[[ -r ~/.atuin/bin/env ]] && . ~/.atuin/bin/env
+eval "$(atuin init zsh)"
+
+# --- kubectl (completion cached; regenerated when kubectl is updated) ---
+if (( $+commands[kubectl] )); then
+  _kc=$HOME/.cache/zsh/kubectl-completion.zsh
+  if [[ ! -s $_kc || $commands[kubectl] -nt $_kc ]]; then
+    mkdir -p ${_kc:h} && kubectl completion zsh >| $_kc
+  fi
+  source $_kc
+  alias k=kubectl
+  compdef __start_kubectl k
+  # arrays so zsh splits them into separate args: kubectl run x $do
+  do=(--dry-run=client -o yaml)
+  now=(--force --grace-period=0)
+  unset _kc
+fi
+
+# --- Aliases ---
+alias y=yazi
+alias o=xdg-open
+
+# --- Ollama for Claude Code (disabled) ---
+# export ANTHROPIC_BASE_URL=...  (see git history / notes)
+
+# --- Plugins (syntax-highlighting must be last) ---
+source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh

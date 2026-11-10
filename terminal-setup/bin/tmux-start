@@ -1,0 +1,39 @@
+#!/bin/bash
+# Ghostty launcher: every new window/tab becomes a NEW tmux window in session
+# "main"; old windows stay next to it. Each terminal gets its own grouped
+# session (gt-<pid>) so tabs can look at different windows independently.
+RES="$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
+LAST="$HOME/.local/share/tmux/resurrect/last"
+
+command -v tmux >/dev/null || exec "${SHELL:-zsh}" -l
+
+# started from inside tmux already: just open a window
+if [ -n "$TMUX" ]; then tmux new-window -c "$PWD"; exit 0; fi
+
+cold=0
+if ! tmux has-session 2>/dev/null; then
+  cold=1
+  tmux new-session -d -s main -c "$HOME"
+  # restore saved windows ONCE, only on a cold server start (after reboot)
+  [ -x "$RES" ] && [ -e "$LAST" ] && tmux run-shell "$RES" >/dev/null 2>&1
+else
+  # drop leftover unattached terminal sessions (windows are kept in "main")
+  tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
+    | awk '$1 ~ /^gt-/ && $2 == 0 {print $1}' \
+    | while read -r s; do tmux kill-session -t "$s" 2>/dev/null; done
+fi
+
+tmux has-session -t main 2>/dev/null || tmux new-session -d -s main -c "$HOME"
+
+args=(new-session -t main -s "gt-$$" \; set-option destroy-unattached on)
+# cold start with nothing restored: reuse the first window instead of adding an empty one
+if [ "$cold" = 0 ] || [ "$(tmux list-windows -t main | wc -l)" -gt 1 ]; then
+  args+=(\; new-window -c "$PWD")
+fi
+
+tmux "${args[@]}"
+rc=$?
+if [ $rc -ne 0 ]; then
+  echo; echo "tmux exited with code $rc"; read -rp "Enter = plain shell " _
+  exec "${SHELL:-zsh}" -l
+fi
