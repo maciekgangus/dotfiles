@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""tmux status segment: Claude 5h / 7d usage from the cache. Prints nothing
+until the first cache exists. Never touches the network."""
+import json, os, sys, time
+CACHE = os.environ.get("CLAUDE_USAGE_CACHE") or os.path.join(
+    os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "claude-usage.json")
+L, R, ICON = "", "", "\U000f06a9"
+def col(p): return "#a6e3a1" if p < 50 else "#f9e2af" if p < 80 else "#f38ba8"
+def left(sec):
+    sec = int(sec)
+    if sec <= 0: return ""
+    d, h, m = sec // 86400, sec % 86400 // 3600, sec % 3600 // 60
+    return f"{d}d{h}h" if d else f"{h}h{m:02d}m" if h else f"{m}m"
+try:
+    d = json.load(open(CACHE))
+except Exception:
+    sys.exit(0)
+now = time.time()
+stale = now - d.get("updated", 0) > 6 * 3600
+parts = []
+for key, label in (("five_hour", "5h"), ("seven_day", "7d")):
+    w = d.get(key)
+    if not w or w.get("used_percentage") is None: continue
+    p, r = w["used_percentage"], w.get("resets_at")
+    if isinstance(r, (int, float)) and r < now: p = 0          # window already reset
+    c = "#6c7086" if stale else col(p)
+    s = f"#[fg=#6c7086]{label} #[fg={c},bold]{round(p)}%#[nobold]"
+    if key == "five_hour" and isinstance(r, (int, float)) and r > now and not stale:
+        s += f" #[fg=#6c7086]\u21bb{left(r - now)}"
+    parts.append(s)
+if parts:
+    sys.stdout.write(f"#[fg=#313244,bg=#181825]{L}#[fg=#cba6f7,bg=#313244]{ICON} " + "  ".join(parts) +
+                     f" #[fg=#313244,bg=#181825]{R} ")
