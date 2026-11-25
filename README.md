@@ -6,6 +6,7 @@ Personal config for Fedora.
 |---|---|---|
 | `terminal-setup/` | Ghostty, tmux, zsh + Starship, Claude usage widget | `bash terminal-setup/install.sh` |
 | `nvim/` | Neovim (LazyVim) | `stow nvim` (or symlink `.config/nvim`) |
+| `tablet/` | Huion tablet (OpenTabletDriver) mapped to the Aorus monitor, GNOME | `bash tablet/install.sh` |
 | `ssh/` | SSH client config | `stow ssh` (or symlink `.ssh_config`) |
 
 See [`terminal-setup/README.md`](terminal-setup/README.md) for details.
